@@ -1,5 +1,6 @@
+from calibre.gui2 import error_dialog
 from calibre.gui2.actions import InterfaceAction
-from calibre_plugins.readwise.main import ReadwiseDialog
+from calibre_plugins.readwise.main import ReadwiseDialog, validate_content_server_url
 from qt.core import QMenu 
 
 class InterfacePlugin(InterfaceAction):
@@ -19,7 +20,7 @@ class InterfacePlugin(InterfaceAction):
       self.create_menu_action(
         self.menu, "send_to_reader", "Send to reader", 
         icon=get_icons('images/upload_book.png'),
-        triggered=self.send_to_reader
+        triggered=self.send_selected_to_reader
       )
 
 
@@ -34,5 +35,14 @@ class InterfacePlugin(InterfaceAction):
     prefs
 
 
-  def send_to_reader(self):
+  def send_selected_to_reader(self):
+    if not validate_content_server_url():
+      d = error_dialog(self.gui, _('Cannot send books'), _('No content server URL set'))
+      d.exec()
+      return 
+    rows = self.gui.library_view.selectionModel().selectedRows()
+    if not rows or len(rows) == 0:
+      d = error_dialog(self.gui, _('Cannot send books'), _('No book selected'))
+      d.exec()
+      return 
     pass

@@ -99,3 +99,10 @@ class ReadwiseDialog(QDialog):
 
   def update_button_state(self):
     self.sync_button.setEnabled(len(prefs['access_token']) > 0)
+
+
+def validate_content_server_url():
+  if not prefs['content_server_url']:
+    return False
+  return True
+
