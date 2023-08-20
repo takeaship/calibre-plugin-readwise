@@ -1,6 +1,6 @@
 from calibre.gui2 import error_dialog
 from calibre.gui2.actions import InterfaceAction
-from calibre_plugins.readwise.main import ReadwiseDialog, validate_content_server_url
+from calibre_plugins.readwise.main import ReadwiseDialog, validate_content_server_url, send_to_reader
 from qt.core import QMenu 
 
 class InterfacePlugin(InterfaceAction):
@@ -39,10 +39,27 @@ class InterfacePlugin(InterfaceAction):
     if not validate_content_server_url():
       d = error_dialog(self.gui, _('Cannot send books'), _('No content server URL set'))
       d.exec()
-      return 
+      return
     rows = self.gui.library_view.selectionModel().selectedRows()
     if not rows or len(rows) == 0:
       d = error_dialog(self.gui, _('Cannot send books'), _('No book selected'))
       d.exec()
-      return 
-    pass
+      return
+    if self.gui.content_server is None or not self.gui.content_server.is_running:
+      self.gui.start_content_server()
+    for row in rows:
+      row_id = row.row()
+      db = self.gui.library_view.model().db
+      mi = db.get_metadata(row_id)
+      if mi.identifiers.get('readwise', None):
+        self.gui.status_bar.show_message(_(f'\"{mi.title}\" has been already sent.'), 3000)
+        continue
+      try:
+        readwise_id = send_to_reader(mi)
+        mi.set_identifier('readwise', readwise_id)
+        db.set_metadata(mi.id, mi, commit=True)
+        self.gui.status_bar.show_message(_(f'\"{mi.title}\" was sent successfully.'), 3000)
+      except Exception as e:
+        d = error_dialog(self.gui, _('Cannot send books'), _('Error sending book: %s') % e)
+        d.exec()
+        return

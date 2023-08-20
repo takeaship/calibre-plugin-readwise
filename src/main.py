@@ -1,6 +1,10 @@
 from calibre_plugins.readwise.config import prefs
+
+from calibre.gui2 import error_dialog
 from PyQt5.Qt import QDialog, QVBoxLayout, QLabel, QPushButton, QMessageBox
 import urllib.request
+from urllib.error import HTTPError
+from http.client import HTTPResponse
 import json
 
 class ReadwiseDialog(QDialog):
@@ -106,3 +110,32 @@ def validate_content_server_url():
     return False
   return True
 
+def send_to_reader(book_metadata):
+    headers = {
+      'Authorization': f"Token {prefs['access_token']}",
+      'Content-Type': 'application/json',
+      'User-Agent': 'calibre-plugin-readwise'
+    }
+    tags = book_metadata.tags + [book_metadata.publisher] + [book_metadata.series] + [book_metadata.identifiers.get('isbn', None)]
+    if "EPUB" in book_metadata.formats:
+        format = "EPUB"
+    elif "PDF" in book_metadata.formats:
+        format = "PDF"
+    else:
+        raise Exception("Only EPUB and PDF formats are supported.")
+    body = {
+      "url": f"{prefs['content_server_url']}/get/{format}/{book_metadata.id}/Calibre",
+      "title": book_metadata.title,
+      "author": ", ".join(book_metadata.authors),
+      "category": str.lower(format),
+      "published_date": book_metadata.pubdate.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+      "image_url": f"{prefs['content_server_url']}/get/thumb/{book_metadata.id}/Calibre?sz=600x800",
+      "tags": [elem for elem in (tags) if elem is not None],
+      "saved_using": "Calibre"
+    }
+    if book_metadata.comments:
+        body["summary"] = book_metadata.comments
+    request = urllib.request.Request('https://readwise.io/api/v3/save', json.dumps(body).encode('utf-8'), headers = headers)
+    response = urllib.request.urlopen(request)
+    response_body = json.loads(response.read().decode('utf-8'))
+    return response_body['id'] 
